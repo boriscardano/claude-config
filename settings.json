@@ -1,0 +1,35 @@
+{
+  "model": "opus",
+  "statusLine": {
+    "type": "command",
+    "command": "input=$(cat); model=$(echo \"$input\" | jq -r '.model.display_name'); dir=$(basename \"$(echo \"$input\" | jq -r '.workspace.current_dir')\"); cd \"$(echo \"$input\" | jq -r '.workspace.current_dir')\" 2>/dev/null; printf '\\033[2m\\033[32m➜\\033[0m '; printf '\\033[2m\\033[36m%s\\033[0m' \"$dir\"; if git rev-parse --git-dir >/dev/null 2>&1; then branch=$(git symbolic-ref --short HEAD 2>/dev/null || git rev-parse --short HEAD 2>/dev/null); if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then dirty=' \\033[2m\\033[33m✗\\033[0m'; else dirty=''; fi; printf ' \\033[2m\\033[34mgit:(\\033[31m%s\\033[34m)%s\\033[0m' \"$branch\" \"$dirty\"; fi; printf ' \\033[2m| \\033[35m%s\\033[0m' \"$model\""
+  },
+  "alwaysThinkingEnabled": true,
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": {
+          "tool": "Edit",
+          "filePattern": "**/*.py"
+        },
+        "command": "cd $(dirname \"$CLAUDE_FILE_PATH\") && uv run ruff format \"$CLAUDE_FILE_PATH\" && uv run ruff check --fix \"$CLAUDE_FILE_PATH\" 2>/dev/null || true"
+      }
+    ]
+  },
+  "mcpServers": {
+    "chrome-devtools": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "chrome-devtools-mcp@latest"
+      ]
+    },
+    "supabase": {
+      "command": "npx",
+      "args": ["-y", "@supabase/mcp-server-supabase@latest"],
+      "env": {
+        "SUPABASE_ACCESS_TOKEN": "${SUPABASE_ACCESS_TOKEN}"
+      }
+    }
+  }
+}

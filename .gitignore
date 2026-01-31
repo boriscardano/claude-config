@@ -1,0 +1,33 @@
+# Session & history data (sensitive)
+history.jsonl
+projects/
+session-env/
+shell-snapshots/
+tasks/
+todos/
+plans/
+
+# Cache & generated files
+cache/
+debug/
+file-history/
+paste-cache/
+stats-cache.json
+statsig/
+telemetry/
+ide/
+
+# Machine-specific settings (paths, local permissions)
+settings.local.json
+
+# Backup files
+*.backup
+
+# External plugin repositories (managed separately)
+plugins/marketplaces/
+
+# Nested claude directory
+.claude/
+
+# OS files
+.DS_Store

@@ -1,0 +1,6 @@
+- never push to main branch, always create feature branch and pull request
+- CRITICAL: always create detailed tasks with dependencies using TaskCreate before starting work
+- use `uv` for all Python package management
+- use `ruff` for linting and formatting
+- prefer async patterns for I/O operations
+- run tests with `uv run pytest` before committing
