@@ -55,14 +55,11 @@ After all agents complete, merge their worktree branches into the feature branch
 3. **Check quality**: Does each agent's output match the requirements?
 4. **If issues found**: Launch a new agent (in worktree) to fix. Max 3 retries per subtask.
 
-## Phase 3: Verify
+## Phase 3: Verify (lint only)
 
-1. Run lint autofix first: `uv run ruff check --fix . && uv run ruff format .`
-2. Run **test-runner agent**: `uv run pytest` (set bash timeout to 600000)
-3. If tests fail, use **debugger agent** to analyze and fix
-4. Re-run tests after any code changes to ensure the final state is tested
-5. Do NOT declare done with failing tests
-6. If verification fails 3 times, consider **rolling back** the problematic changes and escalating to the user rather than continuing to patch
+1. Run lint autofix: `uv run ruff check --fix . && uv run ruff format .`
+2. Fix any lint errors that can't be auto-fixed
+3. Do NOT run tests here — tests run once in Phase 5 before merge
 
 ## Phase 3.5: Browser Verification (if web app)
 
@@ -91,13 +88,18 @@ Each `/polish` round reviews, fixes, tests, commits, and pushes. Do NOT skip thi
 ## Phase 5: Deliver & Report
 
 1. **Create feature branch and PR** via pr-manager agent — never push to main
-2. Provide the user a summary:
+2. **Run tests once** before requesting merge: launch **test-runner agent** with `uv run pytest` (set bash timeout to 600000)
+   - If tests fail, use **debugger agent** to fix, then re-run tests
+   - Max 3 retries before escalating to the user
+   - Do NOT request merge with failing tests
+3. Provide the user a summary:
    - What was done (completed tasks)
    - What was fixed during polish rounds
+   - Test results (pass/fail counts)
    - PR URL
    - What needs attention (if anything)
    - Suggested next steps (CodeRabbit review, `/ship`, etc.)
-3. **Status updates**: Report to the user after each phase transition and after each task completion
+4. **Status updates**: Report to the user after each phase transition and after each task completion
 
 ## Context Management
 
@@ -122,7 +124,8 @@ Know when to suggest these instead of managing manually:
 - **Trivial fixes** (1-2 lines) — just do them yourself, don't spin up an agent
 - **Keep the user informed** — brief status update after each phase transition and task completion
 - **Ask before proceeding** if the task is ambiguous or has multiple valid approaches
-- **Never proceed with failing tests** — fix them first
+- **Tests run once** — only in Phase 5, right before merge. Do not run tests during implementation, review, or polish phases.
+- **Never merge with failing tests** — fix them first
 - **Never push to main** — always create a feature branch and PR
 - **Never merge PRs** without explicit user confirmation
 - **Max 3 retries** per failed subtask before escalating to the user

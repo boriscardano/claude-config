@@ -76,23 +76,20 @@ echo "BRANCH_NAME=feature/issue-$ARGUMENTS"
 
 3. After implementation, run a **code-cleanup agent** to remove any debug code or unused imports.
 
-## Phase 4: QA Loop (max 3 iterations)
+## Phase 4: QA (read-only review + lint)
 
 Launch QA agents **in parallel** (single message):
-1. **test-runner agent**: `cd <WORKTREE_DIR> && uv run pytest` (set Bash timeout to 600000ms — test suite may take ~8 min)
-2. **code-reviewer agent**: Review all changes. **IMPORTANT: Include in prompt: "Do NOT run any tests or pytest commands. Only read and analyze code."**
-3. **security-scanner agent**: Scan for new vulnerabilities
-4. Run lint: `cd <WORKTREE_DIR> && uv run ruff check --fix .`
+1. **code-reviewer agent**: Review all changes. **IMPORTANT: Include in prompt: "Do NOT run any tests or pytest commands. Only read and analyze code."**
+2. **security-scanner agent**: Scan for new vulnerabilities
+3. Run lint and format: `cd <WORKTREE_DIR> && uv run ruff check --fix . && uv run ruff format .`
 
-**If any agent reports failures**:
-- Use **debugger agent** to analyze failures
+**If any agent reports issues**:
 - Fix the issues (sequential writes)
-- Re-run this phase (max 3 iterations total)
-- Do NOT proceed to Phase 5 with failing tests
+- Re-run review (max 3 iterations total)
 
-**If failures persist after 3 iterations**: Stop and report the remaining issues to the user. Do not force-proceed.
+Do NOT run tests here — tests run once in Phase 5 before merge.
 
-## Phase 5: Commit & PR
+## Phase 5: Commit, Test & PR
 
 1. **git-manager agent**: Create atomic commits with conventional messages referencing #$ARGUMENTS
 
@@ -101,7 +98,11 @@ Launch QA agents **in parallel** (single message):
    cd <WORKTREE_DIR> && git push -u origin <BRANCH_NAME>
    ```
 
-3. **Create PR**:
+3. **Run tests once** before creating PR: launch **test-runner agent** with `cd <WORKTREE_DIR> && uv run pytest` (set Bash timeout to 600000ms)
+   - If tests fail, use **debugger agent** to fix, then re-run tests (max 3 retries)
+   - Do NOT create PR with failing tests
+
+4. **Create PR**:
    ```bash
    cd <WORKTREE_DIR> && gh pr create --base main --title "<prefix>(scope): <title from issue>" --body "$(cat <<'EOF'
    Closes #$ARGUMENTS
@@ -149,7 +150,8 @@ cd <MAIN_REPO> && git worktree remove <WORKTREE_DIR> && git fetch --prune && git
 - **Always `cd <WORKTREE_DIR> &&`** before every bash command (cd doesn't persist between Bash calls)
 - **Never use shell variables** (`$WORKTREE_DIR`) in subsequent Bash calls — inline the resolved literal paths
 - **Always `uv sync`** after creating a worktree
-- **Never proceed with failing tests** — fix them first (max 3 QA loops)
+- **Tests run once** — only in Phase 5, right before PR creation. Do not run tests during implementation or review phases.
+- **Never create PR with failing tests** — fix them first (max 3 retries)
 - **Never work on main branch**
 - **Ask before cleaning up worktree**
 - **code-reviewer agents must NEVER run tests** — always include "Do NOT run any tests or pytest commands" in their prompts
