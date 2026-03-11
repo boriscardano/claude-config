@@ -43,8 +43,7 @@ Launch ALL in parallel:
 1. **code-reviewer agent**: Review all changed files for quality, bugs, and best practices. IMPORTANT: Include in the agent prompt: "Do NOT run any tests or pytest commands. Only read and analyze code." (Code-reviewer agents running tests causes timeout loops.)
 2. **security-scanner agent**: Scan for secrets, vulnerabilities, OWASP issues, dependency security
 3. **code-cleanup agent**: Scan for unused imports, debug statements, commented code, stale TODOs
-4. **test-runner agent**: Run `uv run pytest` (no `-x` — show ALL failures). Set bash timeout to 600000 (10 min) since test suites can be slow. Do NOT pass `--timeout` flag to pytest — it is not supported.
-5. Run lint and format check (identify only, don't fix yet):
+4. Run lint and format check (identify only, don't fix yet):
    ```bash
    uv run ruff check .
    uv run ruff format --check .
@@ -62,7 +61,6 @@ Collect all findings from Phase 2 and categorize them. The fix strategy depends 
 - UI issues → **streamlit-pro agent**
 - Code structure → **refactor-pro agent**
 - Cleanup (dead code, imports) → **code-cleanup agent**
-- Test failures → **debugger agent**
 
 ### Small fix set (1-4 independent issue groups)
 
@@ -99,11 +97,12 @@ uv run ruff format .
 ## Phase 4: Verify (read-only parallel, then loop if needed)
 
 Launch in parallel:
-1. **test-runner agent**: Run full test suite (bash timeout: 600000). Do NOT pass `--timeout` to pytest.
-2. **code-reviewer agent**: Quick review of the fixes. Include: "Do NOT run any tests or pytest commands. Only read and analyze code."
-3. **security-scanner agent**: Re-scan for remaining issues
+1. **code-reviewer agent**: Quick review of the fixes. Include: "Do NOT run any tests or pytest commands. Only read and analyze code."
+2. **security-scanner agent**: Re-scan for remaining issues
 
-**If any agent reports failures**: loop back to Phase 3 (max 3 total iterations). Do NOT proceed with failing tests — the point is to ship clean code.
+Do NOT run tests here — tests are run once in `/manage` Phase 5 before merge. `/polish` focuses on code quality, not test verification.
+
+**If any agent reports issues**: loop back to Phase 3 (max 3 total iterations).
 
 ## Phase 5: Commit & Push
 

@@ -97,40 +97,35 @@ For each issue (in the order determined by Phase 2):
    ```
    Use the commit prefix determined in Phase 2 (`fix:`, `feat:`, `refactor:`, etc.).
 
-4. Run a quick sanity check after each issue (set timeout to 600000 since test suite may be slow):
-   ```bash
-   cd <WORKTREE_DIR> && uv run pytest -x
-   ```
-   If tests fail, use **debugger agent** to fix before moving to the next issue.
+4. After all issues implemented, run **code-cleanup agent** across all modified files.
 
-5. After all issues implemented, run **code-cleanup agent** across all modified files.
-
-## Phase 5: QA Loop (max 3 iterations)
+## Phase 5: QA (read-only review + lint)
 
 Launch QA agents **in parallel** (single message):
-1. **test-runner agent**: `cd <WORKTREE_DIR> && uv run pytest` (set Bash timeout to 600000ms — test suite may take ~8 min)
-2. **code-reviewer agent**: Review all changes holistically. **IMPORTANT: Include in prompt: "Do NOT run any tests or pytest commands. Only read and analyze code."**
-3. **security-scanner agent**: Final security scan
-4. Run lint: `cd <WORKTREE_DIR> && uv run ruff check --fix .`
+1. **code-reviewer agent**: Review all changes holistically. **IMPORTANT: Include in prompt: "Do NOT run any tests or pytest commands. Only read and analyze code."**
+2. **security-scanner agent**: Final security scan
+3. Run lint and format: `cd <WORKTREE_DIR> && uv run ruff check --fix . && uv run ruff format .`
 
-**If any agent reports failures**:
-- Use **debugger agent** to analyze root cause
+**If any agent reports issues**:
 - Fix issues (sequential writes)
-- Re-run this phase (max 3 iterations)
-- Do NOT proceed to Phase 6 with failing tests
+- Re-run review (max 3 iterations)
 
-**If failures persist after 3 iterations**: Stop and report the remaining issues to the user. Do not force-proceed.
+Do NOT run tests here — tests run once in Phase 6 before PR creation.
 
-## Phase 6: Push & Create PR
+## Phase 6: Test, Push & Create PR
 
-Commits were already created per-issue in Phase 4. Now push and create the PR.
+Commits were already created per-issue in Phase 4. Now test, push, and create the PR.
 
-1. **Push**:
+1. **Run tests once** before creating PR: launch **test-runner agent** with `cd <WORKTREE_DIR> && uv run pytest` (set Bash timeout to 600000ms)
+   - If tests fail, use **debugger agent** to fix, then re-run tests (max 3 retries)
+   - Do NOT create PR with failing tests
+
+2. **Push**:
    ```bash
    cd <WORKTREE_DIR> && git push -u origin <BRANCH_NAME>
    ```
 
-2. **Create PR** — choose the title prefix based on the dominant issue type (e.g., if 2/3 issues are bugs, use `fix:`; if mixed, use `chore:`):
+3. **Create PR** — choose the title prefix based on the dominant issue type (e.g., if 2/3 issues are bugs, use `fix:`; if mixed, use `chore:`):
    ```bash
    cd <WORKTREE_DIR> && gh pr create --base main --title "<prefix>: implement issues #<first>-#<last>" --body "$(cat <<'EOF'
    ## Summary
@@ -185,14 +180,14 @@ cd <MAIN_REPO> && git worktree remove <WORKTREE_DIR> && git fetch --prune && git
 - **Always `cd <WORKTREE_DIR> &&`** before every bash command (cd doesn't persist between Bash calls)
 - **Never use shell variables** (`$WORKTREE_DIR`) in subsequent Bash calls — inline the resolved literal paths
 - **Always `uv sync`** after creating a worktree
-- **Never proceed with failing tests** — fix them first (max 3 QA loops)
-- **Run sanity tests between each issue** implementation to catch problems early
+- **Tests run once** — only in Phase 6, right before PR creation. Do not run tests during implementation, review, or polish phases.
+- **Never create PR with failing tests** — fix them first (max 3 retries)
 - **Commit immediately after each issue** — one commit per issue, no deferred batch commits
 - **Limit batch size to 3-5 issues** — reject >5 without explicit user confirmation
 - **Never work on main branch**
 - **Ask before cleaning up worktree**
 - **code-reviewer agents must NEVER run tests** — always include "Do NOT run any tests or pytest commands" in their prompts
-- **Set Bash timeout to 600000** for any pytest command (test suite may take ~8 min)
+- **Set Bash timeout to 600000** for the pytest command in Phase 6 (test suite may take ~8 min)
 - **Never merge PRs without explicit user confirmation**
 - **Use `/polish` skill** (via Skill tool) for PR polishing, not manual review
 - **Use `/manage` skill** when coordinating >3 parallel agents or when the implementation plan is complex
