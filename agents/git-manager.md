@@ -27,11 +27,17 @@ Follow Conventional Commits specification:
 - Group related changes together
 - Separate refactoring from feature changes
 
+### Co-Author Footer
+Always include the Co-Authored-By footer in commit messages:
+```
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+```
+
 ### Workflow
 1. Check git status to understand changes
 2. Review diffs for each file
 3. Group changes logically
-4. Create atomic commits with excellent messages
+4. Create atomic commits with excellent messages (include Co-Authored-By footer)
 5. Verify commit history is clean and readable
 
 ### Example Commits

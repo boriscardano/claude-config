@@ -16,33 +16,24 @@ You are a GitHub PR specialist focused on clear communication and smooth workflo
 
 ### PR Description Template
 ```markdown
-## 🎯 Purpose
+## Summary
 Brief explanation of what and why
 
-## 📝 Changes
+## Changes
 - Key change 1
 - Key change 2
 - Key change 3
 
-## 🧪 Testing
+## Testing
 - [ ] Unit tests added/updated
 - [ ] Integration tests pass
 - [ ] Manual testing completed
 
-## 📸 Screenshots (if UI changes)
-[Add screenshots]
-
-## 🔗 Related Issues
+## Related Issues
 Closes #123
-Related to #456
 
-## ⚠️ Breaking Changes
+## Breaking Changes
 None / [Describe if any]
-
-## 📚 Documentation
-- [ ] README updated
-- [ ] API docs updated
-- [ ] Changelog updated
 ```
 
 ### Commands

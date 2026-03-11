@@ -3,16 +3,32 @@ name: catchup
 description: Load all uncommitted changes into context to resume work
 ---
 
-First, sync with the remote repository:
+Sync with remote and show all in-progress work so I can resume.
 
-1. Run `git fetch origin` to get latest remote changes
-2. Run `git pull origin main --rebase` to pull latest changes from main (if on main branch) or rebase current branch on latest main
+1. **Fetch remote**: `git fetch origin`
 
-Then show me all uncommitted changes so I can understand the current state:
+2. **Detect current branch**:
+   ```bash
+   CURRENT=$(git branch --show-current) && echo "On branch: $CURRENT"
+   ```
 
-3. Run `git status` to see modified/untracked files
-4. Run `git diff` to see unstaged changes
-5. Run `git diff --cached` to see staged changes
-6. Run `git log origin/main..HEAD --oneline` to see unpushed commits
+3. **Sync with remote** (branch-aware):
+   - If on `main`/`master`: `git pull origin main --rebase`
+   - If on a feature branch: do NOT rebase — just show how far ahead/behind:
+     ```bash
+     git log --oneline origin/main..HEAD
+     git log --oneline HEAD..origin/main
+     ```
 
-Summarize what work is in progress and ask what I'd like to continue with.
+4. **Show working state** (run all in parallel):
+   - `git status` — modified/untracked files
+   - `git diff` — unstaged changes
+   - `git diff --cached` — staged changes
+   - `git log origin/main..HEAD --oneline` — unpushed commits
+
+5. **Check for active worktrees**:
+   ```bash
+   git worktree list
+   ```
+
+6. Summarize what work is in progress and ask what I'd like to continue with.
