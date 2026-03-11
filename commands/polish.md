@@ -5,141 +5,102 @@ description: Review all changes, fix issues, commit and push to origin. Optional
 
 Execute the complete code polishing workflow.
 
-## Phase 0: Create Task Plan (CRITICAL - DO THIS FIRST)
+## Phase 0: Task Plan
 
-Before any work, create detailed tasks with dependencies:
-1. Use TaskCreate for each phase of work
-2. Set up blockedBy dependencies between tasks
-3. Update task status as you progress (in_progress -> completed)
+Create tasks with TaskCreate:
+- Task 1: "Review and scan changes"
+- Task 2: "Fix identified issues" (blockedBy: 1)
+- Task 3: "Verify fixes and push" (blockedBy: 2)
 
-Example tasks for /polish:
-- Task 1: "Run code review and security scan" (no dependencies)
-- Task 2: "Fix identified issues" (blockedBy: Task 1)
-- Task 3: "Verify fixes with tests" (blockedBy: Task 2)
-- Task 4: "Commit and push" (blockedBy: Task 3)
+Update task status as you progress.
 
-## Available Agents
+## Phase 1: Setup
 
-Use these specialized agents throughout the workflow:
-- **code-reviewer**: Code quality, security, and best practices review
-- **code-cleanup**: Remove debug code, unused imports, commented code
-- **test-runner**: Run tests, analyze failures, check coverage
-- **security-scanner**: Security audits and vulnerability detection
-- **refactor-pro**: Code restructuring suggestions
-- **python-pro**: Python code fixes and modern patterns
-- **fastapi-pro**: API-related fixes
-- **streamlit-pro**: Streamlit UI fixes
-- **debugger**: Debug issues, test failures, analyze error patterns and logs
-- **git-manager**: Git operations and commits
-- **deployment-monitor**: CI/CD monitoring
-- **coderabbit-monitor**: Monitor CodeRabbit reviews
+1. **If PR number provided in $ARGUMENTS**:
+   ```bash
+   gh pr checkout $ARGUMENTS
+   gh pr diff $ARGUMENTS
+   ```
+   If no PR number, work on the current branch.
 
-## Phase 1: Setup (after creating tasks)
+2. **Determine working directory**: Check if inside a worktree or main repo:
+   ```bash
+   git rev-parse --show-toplevel
+   ```
+   Use this as `$WORK_DIR` for all subsequent commands.
 
-If a PR number is provided in $ARGUMENTS:
-- Run `gh pr checkout $ARGUMENTS` to checkout the pull request branch
-- Run `gh pr diff $ARGUMENTS` to see what changes are in the PR
-- If no PR number is provided, work on the current branch
+3. **Get the diff to review**:
+   ```bash
+   git diff origin/main...HEAD --stat
+   ```
 
-## Phase 2: Parallel Review & Analysis (SINGLE message with multiple Task calls)
+## Phase 2: Parallel Review (read-only, single message)
 
-Launch ALL these agents IN PARALLEL:
+Launch ALL in parallel:
 
-1. **code-reviewer agent** (launch multiple for large PRs):
-   - Each reviewer focuses on specific files or directories
-   - Check for: security vulnerabilities, performance issues, code quality
+1. **code-reviewer agent**: Review all changed files for quality, bugs, and best practices
+2. **security-scanner agent**: Scan for secrets, vulnerabilities, OWASP issues, dependency security
+3. **code-cleanup agent**: Scan for unused imports, debug statements, commented code, stale TODOs
+4. **test-runner agent**: Run `uv run pytest` (no `-x` — show ALL failures)
+5. Run lint: `uv run ruff check .` (identify only, don't fix yet)
 
-2. **security-scanner agent**:
-   - Scan for secrets, vulnerabilities, OWASP issues
-   - Check dependency security
+## Phase 3: Fix Issues (SEQUENTIAL writes, max 3 iterations)
 
-3. **code-cleanup agent**:
-   - Scan for unused imports, debug statements, commented code
-   - Identify TODO/FIXME comments that should be addressed
+Collect all findings from Phase 2, then fix **sequentially** (one agent at a time):
 
-4. **test-runner agent**:
-   - Run `uv run pytest -x` to verify tests pass
-   - Check coverage levels
-   - Identify untested code paths
+1. **Pick the right agent** per issue type:
+   - Security vulnerabilities → **python-pro agent** (with security context from scanner)
+   - Python code quality → **python-pro agent**
+   - API issues → **fastapi-pro agent**
+   - UI issues → **streamlit-pro agent**
+   - Code structure → **refactor-pro agent**
+   - Cleanup (dead code, imports) → **code-cleanup agent**
+   - Test failures → **debugger agent**
 
-5. **Run linting**:
-   - `uv run ruff check .` to identify lint issues
+2. Group fixes that touch the same files into one agent call to avoid conflicts.
 
-## Phase 3: Analyze & Categorize Issues
+3. After all fixes, run lint: `uv run ruff check --fix .`
 
-Collect results from all parallel agents and:
-- Group issues by type: security, performance, bugs, style, tests
-- Group issues by affected files/modules
-- Determine which specialized agent type is best for each category:
-  * **security-scanner**: Security vulnerabilities, secrets exposure
-  * **python-pro**: Python code issues, async problems, type hints, modern Python
-  * **fastapi-pro**: FastAPI endpoints, SQLAlchemy, Pydantic, API design
-  * **streamlit-pro**: Streamlit UI issues, state management, caching
-  * **debugger**: Bugs, test failures, runtime errors, logic issues
-  * **refactor-pro**: Code smell fixes, structural improvements
-  * **debugger**: Complex error patterns, stack traces, production issues, test failures
+## Phase 4: Verify (read-only parallel, then loop if needed)
 
-## Phase 4: Fix Issues (SINGLE message with multiple Task calls)
-
-Launch multiple fix agents IN PARALLEL based on issue categories:
-
-1. **security-scanner agent**: Fix security vulnerabilities
-2. **python-pro agent**: Fix Python code quality issues
-3. **streamlit-pro agent**: Fix Streamlit UI issues (if applicable)
-4. **fastapi-pro agent**: Fix API issues (if applicable)
-5. **refactor-pro agent**: Apply refactoring improvements
-6. **code-cleanup agent**: Remove debug code, fix style issues
-
-Provide clear context and file references to each agent.
-
-## Phase 5: Verify Fixes (SINGLE message with multiple Task calls)
-
-Launch ALL IN PARALLEL:
-
+Launch in parallel:
 1. **test-runner agent**: Run full test suite, verify coverage
-2. **security-scanner agent**: Re-scan for any remaining vulnerabilities
-3. **code-reviewer agent**: Quick review of all fixes
-4. **debugger agent**: Verify no regressions introduced
-5. `uv run ruff check --fix .` - Fix any remaining lint issues
+2. **code-reviewer agent**: Quick review of the fixes
+3. **security-scanner agent**: Re-scan for remaining issues
 
-## Phase 6: Commit Changes
+**If any agent reports failures**: loop back to Phase 3 (max 3 total iterations). Do NOT proceed with failing tests.
 
-Use **git-manager agent** to:
-- Stage all changes: `git add -A`
-- Create comprehensive commit message describing all fixes
-- Follow conventional commit format
-- Reference issues if applicable
-- Commit all changes
+## Phase 5: Commit & Push
 
-## Phase 7: Push & Monitor
+1. **Stage specific files** (NOT `git add -A`):
+   ```bash
+   git add <list of changed files by name>
+   ```
 
-1. **Push to origin**:
-   - `git push origin HEAD`
-   - If working on a PR, note changes have been pushed
+2. **Commit** with conventional message:
+   ```
+   chore: polish code quality, fix <summary of main fixes>
+   ```
 
-2. **Monitor CI** (use **deployment-monitor agent**):
-   - `gh run list --limit 3`
-   - `gh pr checks` (if PR exists)
-   - Report CI status
+3. **Push**: `git push origin HEAD`
 
-3. **If CI fails**:
-   - Use **debugger agent** to analyze failure logs and investigate issues
-   - Fix issues and repeat from Phase 4
+4. **Monitor CI**:
+   ```bash
+   gh pr checks 2>/dev/null || gh run list --limit 3
+   ```
 
-## Phase 8: CodeRabbit Review (if PR)
+5. **If CI fails**: use **debugger agent** to analyze logs, fix, and loop back to Phase 4.
 
-If working on a PR:
+## Phase 6: CodeRabbit Review (if PR exists)
 
 1. Use **coderabbit-monitor agent** to check review status
-2. If CodeRabbit has comments, categorize and address using appropriate agents
-3. Push fixes and wait for re-review
+2. If CodeRabbit has comments:
+   - Fix issues sequentially (one agent at a time)
+   - Push fixes
+   - Re-check review status (max 3 iterations)
 
-## Summary
-
-After each major phase, provide a brief summary of what was accomplished.
-
-Usage examples:
-- `/polish` - Polish current branch
-- `/polish 123` - Polish pull request #123
+Usage:
+- `/polish` — Polish current branch
+- `/polish 123` — Polish pull request #123
 
 Current task context: $ARGUMENTS
