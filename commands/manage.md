@@ -107,11 +107,10 @@ Each `/polish` round reviews, fixes, tests, commits, and pushes. Do NOT skip thi
 ## Awareness of Other Commands
 
 Know when to suggest these instead of managing manually:
-- `/fix-issue <N>` — Quick fix for a simple GitHub issue
-- `/implement-issue <N>` — Full implementation of a complex issue with worktree
+- `/implement-issue <N>` — Full implementation of a single issue with worktree
 - `/batch-implement <N1 N2 N3>` — Implement 3-5 related issues together
 - `/polish` or `/polish <PR#>` — Review and clean up a PR
-- `/ship` — Push to production
+- `/catchup` — Resume work by loading all uncommitted changes
 
 ## Rules
 

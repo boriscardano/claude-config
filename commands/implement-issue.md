@@ -7,50 +7,54 @@ Implement GitHub issue #$ARGUMENTS comprehensively using parallel subagents.
 
 ## Phase 0: Task Plan (CRITICAL - DO THIS FIRST)
 
-Create tasks with TaskCreate and set up blockedBy dependencies:
-- Task 1: "Setup worktree for issue #$ARGUMENTS"
-- Task 2: "Fetch and analyze issue" (blockedBy: 1)
-- Task 3: "Implement changes" (blockedBy: 2)
-- Task 4: "QA and fix loop" (blockedBy: 3)
-- Task 5: "Commit and create PR" (blockedBy: 4)
-- Task 6: "Polish" (blockedBy: 5)
+Create tasks with TaskCreate and set up blockedBy dependencies. **IMPORTANT**: TaskCreate returns dynamic IDs — capture each returned ID and use it in subsequent `blockedBy` arrays. Do NOT hardcode IDs.
+
+```
+task_setup     = TaskCreate("Setup worktree for issue #$ARGUMENTS")        → returns ID_A
+task_analyze   = TaskCreate("Fetch and analyze issue", blockedBy=[ID_A])   → returns ID_B
+task_implement = TaskCreate("Implement changes", blockedBy=[ID_B])         → returns ID_C
+task_qa        = TaskCreate("QA and fix loop", blockedBy=[ID_C])           → returns ID_D
+task_pr        = TaskCreate("Create PR", blockedBy=[ID_D])                 → returns ID_E
+task_polish    = TaskCreate("Polish", blockedBy=[ID_E])                    → returns ID_F
+```
 
 Update task status as you progress (in_progress -> completed).
 
 ## Phase 1: Setup Worktree
 
-Store paths as shell variables for all subsequent commands:
+Compute paths in a single bash call and **remember the resolved values** for use in all subsequent commands. Shell variables do NOT persist between Bash tool calls, so you must inline the actual paths in every subsequent command.
 
 ```bash
-MAIN_REPO=$(git rev-parse --show-toplevel)
-PROJECT_NAME=$(basename "$MAIN_REPO")
-WORKTREE_DIR="$MAIN_REPO/../$PROJECT_NAME-issue-$ARGUMENTS"
-BRANCH_NAME="feature/issue-$ARGUMENTS"
+MAIN_REPO=$(git rev-parse --show-toplevel) && \
+PROJECT_NAME=$(basename "$MAIN_REPO") && \
+echo "MAIN_REPO=$MAIN_REPO" && \
+echo "WORKTREE_DIR=$MAIN_REPO/../$PROJECT_NAME-issue-$ARGUMENTS" && \
+echo "BRANCH_NAME=feature/issue-$ARGUMENTS"
 ```
+
+**CRITICAL**: Note the resolved paths from the output above. In ALL subsequent Bash calls, use the literal resolved paths (e.g., `/Users/foo/project-issue-42`), NOT shell variables like `$WORKTREE_DIR`.
 
 1. **Fetch latest main**: `git fetch origin main`
 
-2. **Check if branch exists**:
+2. **Check if branch exists** (use the literal resolved branch name):
    ```bash
-   git branch --list "$BRANCH_NAME" && echo "EXISTS" || echo "NEW"
+   git branch --list "<BRANCH_NAME>" && echo "EXISTS" || echo "NEW"
    ```
-   - If EXISTS: `git worktree add "$WORKTREE_DIR" "$BRANCH_NAME"` (reuse branch)
-   - If NEW: `git worktree add "$WORKTREE_DIR" -b "$BRANCH_NAME" origin/main`
+   - If EXISTS: `git worktree add <WORKTREE_DIR> <BRANCH_NAME>` (reuse branch)
+   - If NEW: `git worktree add <WORKTREE_DIR> -b <BRANCH_NAME> origin/main`
 
 3. **Install dependencies in worktree**:
    ```bash
-   cd "$WORKTREE_DIR" && uv sync
+   cd <WORKTREE_DIR> && uv sync
    ```
 
-4. **Verify**: `pwd && git branch --show-current`
-
-**CRITICAL**: All subsequent bash commands MUST use `cd "$WORKTREE_DIR" &&` prefix since cd does not persist between tool calls.
+4. **Verify**: `cd <WORKTREE_DIR> && pwd && git branch --show-current`
 
 ## Phase 2: Fetch & Analyze (PARALLEL read-only agents)
 
 1. **Fetch issue**: `gh issue view $ARGUMENTS --json title,body,labels,assignees`
 
-2. **Launch read-only analysis agents in parallel** (single message, multiple Task calls):
+2. **Launch read-only analysis agents in parallel** (single message, multiple Agent calls):
    - **Explore agent** (thoroughness: "very thorough"): Map all files relevant to this issue
    - **Plan agent**: Create implementation plan from the issue description and codebase analysis
    - **security-scanner agent**: Pre-scan affected areas for existing vulnerabilities
@@ -74,11 +78,11 @@ BRANCH_NAME="feature/issue-$ARGUMENTS"
 
 ## Phase 4: QA Loop (max 3 iterations)
 
-Launch read-only QA agents **in parallel** (single message):
-1. **test-runner agent**: `cd "$WORKTREE_DIR" && uv run pytest`
-2. **code-reviewer agent**: Review all changes
+Launch QA agents **in parallel** (single message):
+1. **test-runner agent**: `cd <WORKTREE_DIR> && uv run pytest` (set Bash timeout to 600000ms — test suite may take ~8 min)
+2. **code-reviewer agent**: Review all changes. **IMPORTANT: Include in prompt: "Do NOT run any tests or pytest commands. Only read and analyze code."**
 3. **security-scanner agent**: Scan for new vulnerabilities
-4. Run lint: `cd "$WORKTREE_DIR" && uv run ruff check --fix .`
+4. Run lint: `cd <WORKTREE_DIR> && uv run ruff check --fix .`
 
 **If any agent reports failures**:
 - Use **debugger agent** to analyze failures
@@ -86,18 +90,20 @@ Launch read-only QA agents **in parallel** (single message):
 - Re-run this phase (max 3 iterations total)
 - Do NOT proceed to Phase 5 with failing tests
 
+**If failures persist after 3 iterations**: Stop and report the remaining issues to the user. Do not force-proceed.
+
 ## Phase 5: Commit & PR
 
 1. **git-manager agent**: Create atomic commits with conventional messages referencing #$ARGUMENTS
 
 2. **Push**:
    ```bash
-   cd "$WORKTREE_DIR" && git push -u origin "$BRANCH_NAME"
+   cd <WORKTREE_DIR> && git push -u origin <BRANCH_NAME>
    ```
 
 3. **Create PR**:
    ```bash
-   cd "$WORKTREE_DIR" && gh pr create --base main --title "<prefix>(scope): <title from issue>" --body "$(cat <<'EOF'
+   cd <WORKTREE_DIR> && gh pr create --base main --title "<prefix>(scope): <title from issue>" --body "$(cat <<'EOF'
    Closes #$ARGUMENTS
 
    ## Summary
@@ -115,26 +121,40 @@ Launch read-only QA agents **in parallel** (single message):
 
 ## Phase 6: Polish
 
-1. Run `/polish` on the PR
+1. Run `/polish` on the PR (use the Skill tool with skill="polish" and the PR number as args)
 2. Use **coderabbit-monitor agent** to wait for CodeRabbit review
 3. Address feedback, push fixes
+4. For large PRs (50+ files), run `/polish` at least 3-5 times before considering it ready
 
 ## Phase 7: Cleanup Worktree
 
 After PR is merged or abandoned:
 
 ```bash
-cd "$MAIN_REPO" && git worktree remove "$WORKTREE_DIR"
-git fetch --prune && git branch -d "$BRANCH_NAME"
+cd <MAIN_REPO> && git worktree remove <WORKTREE_DIR> && git fetch --prune && git branch -d <BRANCH_NAME>
 ```
+
+**NOTE**: Do NOT clean up automatically. Ask the user before removing the worktree.
+
+## Error Handling
+
+- **Worktree creation fails**: Check if branch already exists or worktree path conflicts. Clean up stale worktrees with `git worktree prune` and retry.
+- **Dependency install fails**: Check for Python version mismatches or lock file issues. Report to user if unresolvable.
+- **Implementation fails**: Stop and report to the user. Do not force partial implementations.
+- **All 3 QA iterations fail**: Stop and report. Do not force-create the PR.
 
 ## Key Rules
 
 - **Read-only agents run in parallel, write agents run sequentially**
-- **Always `cd "$WORKTREE_DIR" &&`** before every bash command (cd doesn't persist)
+- **Always `cd <WORKTREE_DIR> &&`** before every bash command (cd doesn't persist between Bash calls)
+- **Never use shell variables** (`$WORKTREE_DIR`) in subsequent Bash calls — inline the resolved literal paths
 - **Always `uv sync`** after creating a worktree
 - **Never proceed with failing tests** — fix them first (max 3 QA loops)
 - **Never work on main branch**
-- **Clean up worktree** after PR is merged
+- **Ask before cleaning up worktree**
+- **code-reviewer agents must NEVER run tests** — always include "Do NOT run any tests or pytest commands" in their prompts
+- **Set Bash timeout to 600000** for any pytest command (test suite may take ~8 min)
+- **Never merge PRs without explicit user confirmation**
+- **Use `/polish` skill** (via Skill tool) for PR polishing, not manual review
 
 Current issue: $ARGUMENTS
