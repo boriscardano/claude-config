@@ -57,11 +57,12 @@ After all agents complete, merge their worktree branches into the feature branch
 
 ## Phase 3: Verify
 
-1. Run **test-runner agent**: `uv run pytest` (set bash timeout to 600000)
-2. Run lint: `uv run ruff check --fix .`
+1. Run lint autofix first: `uv run ruff check --fix . && uv run ruff format .`
+2. Run **test-runner agent**: `uv run pytest` (set bash timeout to 600000)
 3. If tests fail, use **debugger agent** to analyze and fix
-4. Do NOT declare done with failing tests
-5. If verification fails 3 times, consider **rolling back** the problematic changes and escalating to the user rather than continuing to patch
+4. Re-run tests after any code changes to ensure the final state is tested
+5. Do NOT declare done with failing tests
+6. If verification fails 3 times, consider **rolling back** the problematic changes and escalating to the user rather than continuing to patch
 
 ## Phase 3.5: Browser Verification (if web app)
 
