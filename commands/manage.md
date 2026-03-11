@@ -22,9 +22,7 @@ You are a **manager/coordinator**. Your job is to plan, delegate, review, and ve
 
 ## Phase 1: Delegate
 
-**Read-only agents run in parallel, write agents run sequentially.**
-
-For independent write tasks, consider using `isolation: "worktree"` so agents work on isolated copies of the repo without conflicting.
+**All agents run in parallel.** Write agents are launched with `isolation: "worktree"`, which creates a temporary git worktree — an isolated, independent copy of the repository on its own branch. This eliminates file conflicts between agents entirely.
 
 Available agents and when to use them:
 - **Explore**: Codebase exploration, finding files, understanding architecture
@@ -43,17 +41,19 @@ Available agents and when to use them:
 
 For each subtask:
 1. Mark task as `in_progress`
-2. Launch the appropriate agent with clear context (what to do, which files, expected outcome)
-3. Review the agent's output
-4. Mark task as `completed` or fix and retry
+2. Launch the appropriate agent with `isolation: "worktree"` (for write agents) and clear context (what to do, which files, expected outcome)
+3. Each agent works on its own branch in its own worktree
+4. Review the agent's output when it completes
+5. Mark task as `completed` or fix and retry
 
-## Phase 2: Review & Iterate
+## Phase 2: Merge & Review
 
-After each agent completes:
-- **Check quality**: Does the output match the requirements?
-- **Check consistency**: Do changes from different agents conflict?
-- **Resolve conflicts**: If two agents' outputs conflict, the agent working on the higher-priority or more architecturally central task takes precedence. Launch a follow-up agent to reconcile.
-- **If issues found**: Launch a new agent to fix (don't reuse failed context). Max 3 retries per subtask.
+After all agents complete, merge their worktree branches into the feature branch:
+
+1. **Merge one-by-one**: Merge each agent's branch into the feature branch in priority order (most architecturally central first)
+2. **Resolve conflicts**: If a merge conflicts, launch a debugger agent to resolve it — or resolve trivial conflicts yourself
+3. **Check quality**: Does each agent's output match the requirements?
+4. **If issues found**: Launch a new agent (in worktree) to fix. Max 3 retries per subtask.
 
 ## Phase 3: Verify
 
@@ -113,7 +113,9 @@ Know when to suggest these instead of managing manually:
 
 ## Rules
 
-- **Read-only agents in parallel, write agents sequentially** — never let two agents write to the same codebase simultaneously (unless using worktree isolation)
+- **All write agents use worktree isolation** — every write agent gets `isolation: "worktree"` so it works on its own branch in its own copy of the repo
+- **All agents run in parallel** — worktree isolation makes sequential execution unnecessary
+- **Merge after completion** — merge agent branches into the feature branch one-by-one, resolving conflicts as they arise
 - **code-reviewer agents must NEVER run tests** — always use a separate test-runner agent for testing
 - **Trivial fixes** (1-2 lines) — just do them yourself, don't spin up an agent
 - **Keep the user informed** — brief status update after each phase transition and task completion
