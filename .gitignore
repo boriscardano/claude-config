@@ -22,6 +22,10 @@ settings.local.json
 
 # Backup files
 *.backup
+backups/
+
+# Usage data
+usage-data/
 
 # External plugin repositories (managed separately)
 plugins/marketplaces/

@@ -5,199 +5,136 @@ description: Implement a GitHub issue comprehensively using parallel subagents
 
 Implement GitHub issue #$ARGUMENTS comprehensively using parallel subagents.
 
-## Phase 0: Create Task Plan (CRITICAL - DO THIS FIRST)
+## Phase 0: Task Plan (CRITICAL - DO THIS FIRST)
 
-Before any work, create detailed tasks with dependencies:
-1. Use TaskCreate for each phase of work
-2. Set up blockedBy dependencies between tasks
-3. Update task status as you progress (in_progress -> completed)
+Create tasks with TaskCreate and set up blockedBy dependencies:
+- Task 1: "Setup worktree for issue #$ARGUMENTS"
+- Task 2: "Fetch and analyze issue" (blockedBy: 1)
+- Task 3: "Implement changes" (blockedBy: 2)
+- Task 4: "QA and fix loop" (blockedBy: 3)
+- Task 5: "Commit and create PR" (blockedBy: 4)
+- Task 6: "Polish" (blockedBy: 5)
 
-Example tasks for /implement-issue:
-- Task 1: "Setup worktree for issue #$ARGUMENTS" (no dependencies)
-- Task 2: "Fetch and analyze issue" (blockedBy: Task 1)
-- Task 3: "Implement changes" (blockedBy: Task 2)
-- Task 4: "Run QA checks" (blockedBy: Task 3)
-- Task 5: "Create PR" (blockedBy: Task 4)
-- Task 6: "Polish and cleanup" (blockedBy: Task 5)
+Update task status as you progress (in_progress -> completed).
 
-## CRITICAL: Use Git Worktree for Isolation
+## Phase 1: Setup Worktree
 
-**IMPORTANT**: This command may run in parallel with other implement-issue agents. To avoid conflicts, ALWAYS use a git worktree for isolated development.
+Store paths as shell variables for all subsequent commands:
 
-## Available Agents
+```bash
+MAIN_REPO=$(git rev-parse --show-toplevel)
+PROJECT_NAME=$(basename "$MAIN_REPO")
+WORKTREE_DIR="$MAIN_REPO/../$PROJECT_NAME-issue-$ARGUMENTS"
+BRANCH_NAME="feature/issue-$ARGUMENTS"
+```
 
-Use these specialized agents throughout the workflow:
-- **Explore**: Codebase exploration and understanding
-- **Plan**: Implementation planning and architecture
-- **python-pro**: Python development and modern patterns
-- **fastapi-pro**: FastAPI/API development
-- **streamlit-pro**: Streamlit UI development
-- **code-reviewer**: Code quality and security review
-- **code-cleanup**: Remove debug code, unused imports
-- **debugger**: Debug issues and test failures
-- **test-runner**: Run tests and analyze coverage
-- **security-scanner**: Security audits and vulnerability checks
-- **refactor-pro**: Code restructuring and improvements
-- **git-manager**: Git operations and commits
-- **pr-manager**: PR creation and management
+1. **Fetch latest main**: `git fetch origin main`
 
-## Workflow
-
-### Phase 1: Setup Isolated Worktree
-
-1. **Get project name**:
+2. **Check if branch exists**:
    ```bash
-   PROJECT_NAME=$(basename $(git rev-parse --show-toplevel))
+   git branch --list "$BRANCH_NAME" && echo "EXISTS" || echo "NEW"
+   ```
+   - If EXISTS: `git worktree add "$WORKTREE_DIR" "$BRANCH_NAME"` (reuse branch)
+   - If NEW: `git worktree add "$WORKTREE_DIR" -b "$BRANCH_NAME" origin/main`
+
+3. **Install dependencies in worktree**:
+   ```bash
+   cd "$WORKTREE_DIR" && uv sync
    ```
 
-2. **Fetch latest main**:
-   ```bash
-   git fetch origin main
-   ```
+4. **Verify**: `pwd && git branch --show-current`
 
-3. **Create isolated worktree** (REQUIRED for parallel execution):
-   ```bash
-   git worktree add ../$PROJECT_NAME-issue-$ARGUMENTS -b feature/issue-$ARGUMENTS origin/main
-   ```
+**CRITICAL**: All subsequent bash commands MUST use `cd "$WORKTREE_DIR" &&` prefix since cd does not persist between tool calls.
 
-4. **Change to worktree directory**:
-   ```bash
-   cd ../$PROJECT_NAME-issue-$ARGUMENTS
-   ```
+## Phase 2: Fetch & Analyze (PARALLEL read-only agents)
 
-5. **Verify isolation**:
-   ```bash
-   pwd  # Should show ../$PROJECT_NAME-issue-$ARGUMENTS
-   git branch  # Should show feature/issue-$ARGUMENTS
-   ```
+1. **Fetch issue**: `gh issue view $ARGUMENTS --json title,body,labels,assignees`
 
-**All subsequent work MUST happen in the worktree directory, NOT the main repo.**
-
-### Phase 2: Fetch & Analyze Issue (PARALLEL)
-
-1. **Fetch issue details**:
-   ```bash
-   gh issue view $ARGUMENTS --json title,body,labels,assignees
-   ```
-
-2. **Launch parallel analysis agents** (SINGLE message with multiple Task calls):
-   - **Explore agent** (thoroughness: "very thorough"): Analyze codebase to understand context
-   - **Plan agent**: Create detailed implementation plan based on issue description
+2. **Launch read-only analysis agents in parallel** (single message, multiple Task calls):
+   - **Explore agent** (thoroughness: "very thorough"): Map all files relevant to this issue
+   - **Plan agent**: Create implementation plan from the issue description and codebase analysis
    - **security-scanner agent**: Pre-scan affected areas for existing vulnerabilities
 
-### Phase 3: Implementation (PARALLEL based on issue type)
+3. **Determine commit prefix** from issue labels:
+   - `bug` → `fix:`, `enhancement`/`feature` → `feat:`, `refactor` → `refactor:`, `docs` → `docs:`
 
-Launch appropriate subagents IN PARALLEL (SINGLE message with multiple Task calls):
+## Phase 3: Implement (SEQUENTIAL writes)
 
-**For Frontend/UI Issues:**
-- **streamlit-pro agent**: Implement Streamlit UI changes
-- **python-pro agent**: Python logic and patterns
-- **code-cleanup agent**: Ensure clean code
+**IMPORTANT**: Write operations must be sequential to avoid file conflicts. Do NOT launch multiple writing agents in parallel.
 
-**For Backend/API Issues:**
-- **python-pro agent**: Implement core logic
-- **fastapi-pro agent**: API endpoints and async patterns
-- **code-cleanup agent**: Ensure clean code
+1. **Pick the right agent** based on issue type and implement:
+   - Frontend/UI → **streamlit-pro agent**
+   - Backend/API → **fastapi-pro agent** or **python-pro agent**
+   - Security → **python-pro agent** (with security context from Phase 2)
+   - Refactoring → **refactor-pro agent**
 
-**For Security Issues:**
-- **security-scanner agent**: Detailed security analysis
-- **code-reviewer agent**: Security-focused review
-- **python-pro agent**: Secure implementation
+2. If the implementation is large, break it into sequential steps — each step using one writing agent at a time.
 
-**For Refactoring Issues:**
-- **refactor-pro agent**: Code restructuring
-- **python-pro agent**: Modern Python patterns
-- **code-cleanup agent**: Clean up after refactoring
+3. After implementation, run a **code-cleanup agent** to remove any debug code or unused imports.
 
-### Phase 4: Quality Assurance (ALL IN PARALLEL - SINGLE message)
+## Phase 4: QA Loop (max 3 iterations)
 
-Launch ALL these agents IN PARALLEL:
+Launch read-only QA agents **in parallel** (single message):
+1. **test-runner agent**: `cd "$WORKTREE_DIR" && uv run pytest`
+2. **code-reviewer agent**: Review all changes
+3. **security-scanner agent**: Scan for new vulnerabilities
+4. Run lint: `cd "$WORKTREE_DIR" && uv run ruff check --fix .`
 
-1. **test-runner agent**: Run full test suite, analyze failures, check coverage
-2. **code-reviewer agent**: Full code review of all changes
-3. **security-scanner agent**: Scan for new vulnerabilities introduced
-4. **code-cleanup agent**: Remove debug statements, unused imports
-5. **debugger agent**: Verify no regressions, investigate any issues
-6. Run `uv run ruff check --fix` for linting
+**If any agent reports failures**:
+- Use **debugger agent** to analyze failures
+- Fix the issues (sequential writes)
+- Re-run this phase (max 3 iterations total)
+- Do NOT proceed to Phase 5 with failing tests
 
-### Phase 5: Commit & PR
+## Phase 5: Commit & PR
 
-1. **git-manager agent**: Create atomic commits with conventional commit messages
+1. **git-manager agent**: Create atomic commits with conventional messages referencing #$ARGUMENTS
 
-2. **Push branch from worktree**:
+2. **Push**:
    ```bash
-   git push -u origin feature/issue-$ARGUMENTS
+   cd "$WORKTREE_DIR" && git push -u origin "$BRANCH_NAME"
    ```
 
-3. **pr-manager agent**: Create PR with comprehensive description:
+3. **Create PR**:
    ```bash
-   gh pr create --base main --title "fix/feat: <title from issue>" --body "Closes #$ARGUMENTS
+   cd "$WORKTREE_DIR" && gh pr create --base main --title "<prefix>(scope): <title from issue>" --body "$(cat <<'EOF'
+   Closes #$ARGUMENTS
 
    ## Summary
    <bullet points of changes>
 
    ## Testing
-   - [ ] Unit tests pass
-   - [ ] Manual testing completed
-   - [ ] Security scan passed
+   - [x] Unit tests pass
+   - [x] Linting passes
+   - [x] Security scan passed
 
-   Generated with Claude Code"
+   Generated with Claude Code
+   EOF
+   )"
    ```
 
-### Phase 6: Polish
+## Phase 6: Polish
 
-1. Run `/polish` command to review, fix issues, and push
+1. Run `/polish` on the PR
 2. Use **coderabbit-monitor agent** to wait for CodeRabbit review
-3. Address feedback using appropriate fix agents
+3. Address feedback, push fixes
 
-### Phase 7: Cleanup Worktree
+## Phase 7: Cleanup Worktree
 
-After PR is merged OR if abandoning work:
+After PR is merged or abandoned:
 
-1. **Return to main repository**:
-   ```bash
-   cd $(git rev-parse --show-toplevel)  # Return to original repo
-   ```
-
-2. **Remove worktree**:
-   ```bash
-   git worktree remove ../$PROJECT_NAME-issue-$ARGUMENTS
-   ```
-
-3. **Clean up branch** (after merge):
-   ```bash
-   git fetch --prune
-   git branch -d feature/issue-$ARGUMENTS
-   ```
+```bash
+cd "$MAIN_REPO" && git worktree remove "$WORKTREE_DIR"
+git fetch --prune && git branch -d "$BRANCH_NAME"
+```
 
 ## Key Rules
 
-- **ALWAYS use git worktree** - Never work in main repo when running parallel agents
-- **Use subagents extensively in parallel** - Launch multiple agents in SINGLE message
-- **Never work on main branch** - Always use feature branches
-- **Atomic commits** - Each logical change in separate commit
-- **Run tests** before and after changes
-- **Security scan** all changes before PR
+- **Read-only agents run in parallel, write agents run sequentially**
+- **Always `cd "$WORKTREE_DIR" &&`** before every bash command (cd doesn't persist)
+- **Always `uv sync`** after creating a worktree
+- **Never proceed with failing tests** — fix them first (max 3 QA loops)
+- **Never work on main branch**
 - **Clean up worktree** after PR is merged
-
-## Parallel Execution Safety
-
-When multiple `/implement-issue` commands run simultaneously:
-- Each gets its own worktree: `../podcasts-chatbot-issue-97`, `../podcasts-chatbot-issue-98`, etc.
-- Each works on isolated branch: `feature/issue-97`, `feature/issue-98`, etc.
-- No file conflicts between agents
-- Each creates separate PR
-
-## Example Usage
-
-```bash
-# Single issue
-/implement-issue 97
-
-# Multiple issues in parallel (each in separate terminal/agent)
-/implement-issue 97  # → worktree: ../podcasts-chatbot-issue-97
-/implement-issue 98  # → worktree: ../podcasts-chatbot-issue-98
-/implement-issue 99  # → worktree: ../podcasts-chatbot-issue-99
-```
 
 Current issue: $ARGUMENTS
