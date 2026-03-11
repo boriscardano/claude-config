@@ -73,6 +73,8 @@ If changes affect a web UI (Streamlit, FastAPI with templates, or any frontend):
 
 ## Phase 4: Polish (3-5 rounds)
 
+**Skip this phase if `/manage` was invoked from within `/polish`** — `/polish` already handles its own review-fix-verify cycle, so re-polishing would create an infinite loop.
+
 After all implementation and verification is complete, run `/polish` to ensure high code quality:
 
 - **Minimum 3 rounds** for standard PRs
@@ -83,7 +85,7 @@ After all implementation and verification is complete, run `/polish` to ensure h
 2. **Round 2**: Catches issues introduced by Round 1 fixes and anything missed
 3. **Round 3+**: Should find less each time. Stop when clean.
 
-Each `/polish` round reviews, fixes, tests, commits, and pushes. Do NOT skip this phase.
+Each `/polish` round reviews, fixes, tests, commits, and pushes. Do NOT skip this phase (unless invoked from `/polish`).
 
 ## Phase 5: Deliver & Report
 
