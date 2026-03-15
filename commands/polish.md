@@ -38,9 +38,17 @@ Execute the complete code polishing workflow: review changes, fix issues, verify
 
 ## Phase 2: Parallel Review (read-only, single message)
 
-Launch ALL in parallel:
+First, measure the change size:
+```bash
+git diff origin/$BASE...HEAD --stat | tail -1
+```
+Parse the number of files changed and lines modified from the summary line.
 
-1. **code-reviewer agent**: Review all changed files for quality, bugs, and best practices. IMPORTANT: Include in the agent prompt: "Do NOT run any tests or pytest commands. Only read and analyze code." (Code-reviewer agents running tests causes timeout loops.)
+### Small changes (<10 files changed AND <200 lines modified)
+
+Launch ALL in parallel (3 agents + lint):
+
+1. **code-reviewer agent**: Review all changed files for quality, bugs, and best practices. IMPORTANT: Include in the agent prompt: "Do NOT run any tests or pytest commands. Only read and analyze code."
 2. **security-scanner agent**: Scan for secrets, vulnerabilities, OWASP issues, dependency security
 3. **code-cleanup agent**: Scan for unused imports, debug statements, commented code, stale TODOs
 4. Run lint and format check (identify only, don't fix yet):
@@ -48,6 +56,44 @@ Launch ALL in parallel:
    uv run ruff check .
    uv run ruff format --check .
    ```
+
+### Medium changes (10+ files changed OR 200+ lines modified)
+
+Launch ALL in parallel (6 agents + lint):
+
+1. **code-reviewer agent**: Review all changed files for quality, bugs, and best practices. IMPORTANT: Include in the agent prompt: "Do NOT run any tests or pytest commands. Only read and analyze code."
+2. **security-scanner agent**: Scan for secrets, vulnerabilities, OWASP issues, dependency security
+3. **code-cleanup agent**: Scan for unused imports, debug statements, commented code, stale TODOs
+4. **python-pro agent**: Review Python-specific patterns — async correctness, type hints, modern idioms, performance anti-patterns. Include: "Do NOT run any tests. Only read and analyze code."
+5. **refactor-pro agent**: Analyze code structure, duplication, design patterns, and separation of concerns. Include: "Do NOT run any tests. Only read and analyze code."
+6. **fastapi-pro agent** (if any API/route files changed) OR **streamlit-pro agent** (if any UI files changed) OR **debugger agent** (default — hunt for potential runtime bugs, edge cases, error handling gaps). Include: "Do NOT run any tests. Only read and analyze code."
+7. Run lint and format check (identify only, don't fix yet):
+   ```bash
+   uv run ruff check .
+   uv run ruff format --check .
+   ```
+
+### Large changes (30+ files changed OR 500+ lines modified)
+
+Launch ALL in parallel (10+ agents + lint). Split reviews into focused, non-overlapping scopes so each agent produces targeted findings:
+
+1. **code-reviewer agent** (scope: logic & correctness): Review business logic, control flow, edge cases, error handling. Include: "Do NOT run any tests or pytest commands. Only read and analyze code. Focus on logic correctness and edge cases."
+2. **code-reviewer agent** (scope: API contracts & data flow): Review function signatures, return types, data transformations, API boundaries. Include: "Do NOT run any tests. Focus on API contracts, data flow, and interface consistency."
+3. **security-scanner agent**: Scan for secrets, vulnerabilities, OWASP issues, dependency security
+4. **code-cleanup agent**: Scan for unused imports, debug statements, commented code, stale TODOs
+5. **python-pro agent** (scope: async & performance): Review async patterns, potential deadlocks, performance anti-patterns, N+1 queries, inefficient loops. Include: "Do NOT run any tests. Only read and analyze code. Focus on async correctness and performance."
+6. **python-pro agent** (scope: types & idioms): Review type hints, modern Python idioms, Pydantic model usage, dataclass patterns. Include: "Do NOT run any tests. Only read and analyze code. Focus on type safety and Pythonic patterns."
+7. **refactor-pro agent**: Analyze code structure, duplication, design patterns, and separation of concerns. Include: "Do NOT run any tests. Only read and analyze code."
+8. **fastapi-pro agent** (if any API/route files changed): Review endpoint design, dependency injection, middleware, response models. Include: "Do NOT run any tests. Only read and analyze code."
+9. **streamlit-pro agent** (if any UI files changed): Review UI patterns, state management, layout, caching. Include: "Do NOT run any tests. Only read and analyze code."
+10. **debugger agent**: Hunt for potential runtime bugs, race conditions, resource leaks, error handling gaps. Include: "Do NOT run any tests. Only read and analyze code."
+11. Run lint and format check (identify only, don't fix yet):
+    ```bash
+    uv run ruff check .
+    uv run ruff format --check .
+    ```
+
+Note: For large changes, agents 8 and 9 are conditional on file types changed. If neither API nor UI files are modified, launch additional focused code-reviewer agents scoped to specific subdirectories instead.
 
 ## Phase 3: Fix Issues (max 3 iterations)
 
