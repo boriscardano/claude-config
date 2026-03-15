@@ -39,12 +39,44 @@ Available agents and when to use them:
 - **git-manager**: Git operations, commits
 - **pr-manager**: PR creation, management
 
+**Agent prompt template** — every agent prompt MUST include all of these:
+```
+## Task
+<what the agent should accomplish — be specific, not vague>
+
+## Files to modify
+<explicit list of files to read and/or edit>
+
+## Expected outcome
+<what "done" looks like — e.g., "endpoint returns 404 instead of 500 for missing resources">
+
+## Constraints
+- <any rules or boundaries — e.g., "do not change the database schema">
+- <relevant context from Phase 0 — e.g., "this must be backwards-compatible with v2 API">
+- Do NOT run any tests or pytest commands. (for read-only/review agents)
+```
+
 For each subtask:
 1. Mark task as `in_progress`
-2. Launch the appropriate agent with `isolation: "worktree"` (for write agents) and clear context (what to do, which files, expected outcome)
+2. Launch the appropriate agent with `isolation: "worktree"` (for write agents) using the prompt template above
 3. Each agent works on its own branch in its own worktree
 4. Review the agent's output when it completes
 5. Mark task as `completed` or fix and retry
+
+### Phase 1 Checkpoint
+
+After all agents complete, report to the user:
+```
+## Phase 1 Complete — Delegation Results
+
+| Task | Agent | Status | Branch |
+|------|-------|--------|--------|
+| <task name> | <agent type> | completed/failed | <branch name> |
+
+**Succeeded**: X of Y
+**Failed**: X (will retry in Phase 2)
+**Ready to merge**: <list of branches>
+```
 
 ## Phase 2: Merge & Review
 
@@ -54,6 +86,19 @@ After all agents complete, merge their worktree branches into the feature branch
 2. **Resolve conflicts**: If a merge conflicts, launch a debugger agent to resolve it — or resolve trivial conflicts yourself
 3. **Check quality**: Does each agent's output match the requirements?
 4. **If issues found**: Launch a new agent (in worktree) to fix. Max 3 retries per subtask.
+
+### Phase 2 Checkpoint
+
+After all merges complete, report to the user:
+```
+## Phase 2 Complete — Merge Results
+
+**Branches merged**: X of Y
+**Conflicts resolved**: X
+**Quality issues found**: X (fixed: Y, retried: Z)
+**Files changed total**: <count>
+**Ready for lint & verification**
+```
 
 ## Phase 3: Verify (lint only)
 
