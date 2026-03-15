@@ -36,6 +36,12 @@ Execute the complete code polishing workflow: review changes, fix issues, verify
    git diff origin/$BASE...HEAD --stat
    ```
 
+5. **Capture the changed file list** for use in all review agents:
+   ```bash
+   CHANGED_FILES=$(git diff origin/$BASE...HEAD --name-only)
+   ```
+   Store this list — it must be included in every review agent's prompt so they know exactly which files to examine.
+
 ## Phase 2: Parallel Review (read-only, single message)
 
 First, measure the change size:
@@ -44,13 +50,30 @@ git diff origin/$BASE...HEAD --stat | tail -1
 ```
 Parse the number of files changed and lines modified from the summary line.
 
+**IMPORTANT**: Every review agent prompt MUST include the list of changed files (`$CHANGED_FILES` from Phase 1) and instruct the agent to focus only on those files. This prevents agents from wasting time scanning the entire codebase.
+
+**Agent prompt template**: Always include this block in every review agent's prompt:
+```
+Review ONLY the following changed files:
+<changed_files>
+$CHANGED_FILES
+</changed_files>
+Do NOT run any tests or pytest commands. Only read and analyze code.
+```
+
+Additionally, instruct each agent to **tag every finding with a severity level**:
+- **CRITICAL**: Security vulnerabilities, data loss risks, crashes, broken functionality
+- **HIGH**: Bugs, incorrect logic, missing error handling, race conditions
+- **MEDIUM**: Code quality issues, missing types, anti-patterns, performance problems
+- **LOW**: Style issues, minor cleanups, naming suggestions, TODOs
+
 ### Small changes (<10 files changed AND <200 lines modified)
 
 Launch ALL in parallel (3 agents + lint):
 
-1. **code-reviewer agent**: Review all changed files for quality, bugs, and best practices. IMPORTANT: Include in the agent prompt: "Do NOT run any tests or pytest commands. Only read and analyze code."
-2. **security-scanner agent**: Scan for secrets, vulnerabilities, OWASP issues, dependency security
-3. **code-cleanup agent**: Scan for unused imports, debug statements, commented code, stale TODOs
+1. **code-reviewer agent**: Review changed files for quality, bugs, and best practices.
+2. **security-scanner agent**: Scan changed files for secrets, vulnerabilities, OWASP issues, dependency security
+3. **code-cleanup agent**: Scan changed files for unused imports, debug statements, commented code, stale TODOs
 4. Run lint and format check (identify only, don't fix yet):
    ```bash
    uv run ruff check .
@@ -61,12 +84,12 @@ Launch ALL in parallel (3 agents + lint):
 
 Launch ALL in parallel (6 agents + lint):
 
-1. **code-reviewer agent**: Review all changed files for quality, bugs, and best practices. IMPORTANT: Include in the agent prompt: "Do NOT run any tests or pytest commands. Only read and analyze code."
-2. **security-scanner agent**: Scan for secrets, vulnerabilities, OWASP issues, dependency security
-3. **code-cleanup agent**: Scan for unused imports, debug statements, commented code, stale TODOs
-4. **python-pro agent**: Review Python-specific patterns — async correctness, type hints, modern idioms, performance anti-patterns. Include: "Do NOT run any tests. Only read and analyze code."
-5. **refactor-pro agent**: Analyze code structure, duplication, design patterns, and separation of concerns. Include: "Do NOT run any tests. Only read and analyze code."
-6. **fastapi-pro agent** (if any API/route files changed) OR **streamlit-pro agent** (if any UI files changed) OR **debugger agent** (default — hunt for potential runtime bugs, edge cases, error handling gaps). Include: "Do NOT run any tests. Only read and analyze code."
+1. **code-reviewer agent**: Review changed files for quality, bugs, and best practices.
+2. **security-scanner agent**: Scan changed files for secrets, vulnerabilities, OWASP issues, dependency security
+3. **code-cleanup agent**: Scan changed files for unused imports, debug statements, commented code, stale TODOs
+4. **python-pro agent**: Review changed files for Python-specific patterns — async correctness, type hints, modern idioms, performance anti-patterns.
+5. **refactor-pro agent**: Analyze changed files for code structure, duplication, design patterns, and separation of concerns.
+6. **fastapi-pro agent** (if any API/route files changed) OR **streamlit-pro agent** (if any UI files changed) OR **debugger agent** (default — hunt for potential runtime bugs, edge cases, error handling gaps).
 7. Run lint and format check (identify only, don't fix yet):
    ```bash
    uv run ruff check .
@@ -77,16 +100,16 @@ Launch ALL in parallel (6 agents + lint):
 
 Launch ALL in parallel (10+ agents + lint). Split reviews into focused, non-overlapping scopes so each agent produces targeted findings:
 
-1. **code-reviewer agent** (scope: logic & correctness): Review business logic, control flow, edge cases, error handling. Include: "Do NOT run any tests or pytest commands. Only read and analyze code. Focus on logic correctness and edge cases."
-2. **code-reviewer agent** (scope: API contracts & data flow): Review function signatures, return types, data transformations, API boundaries. Include: "Do NOT run any tests. Focus on API contracts, data flow, and interface consistency."
+1. **code-reviewer agent** (scope: logic & correctness): Review business logic, control flow, edge cases, error handling. Additional scope instruction: "Focus on logic correctness and edge cases."
+2. **code-reviewer agent** (scope: API contracts & data flow): Review function signatures, return types, data transformations, API boundaries. Additional scope instruction: "Focus on API contracts, data flow, and interface consistency."
 3. **security-scanner agent**: Scan for secrets, vulnerabilities, OWASP issues, dependency security
 4. **code-cleanup agent**: Scan for unused imports, debug statements, commented code, stale TODOs
-5. **python-pro agent** (scope: async & performance): Review async patterns, potential deadlocks, performance anti-patterns, N+1 queries, inefficient loops. Include: "Do NOT run any tests. Only read and analyze code. Focus on async correctness and performance."
-6. **python-pro agent** (scope: types & idioms): Review type hints, modern Python idioms, Pydantic model usage, dataclass patterns. Include: "Do NOT run any tests. Only read and analyze code. Focus on type safety and Pythonic patterns."
-7. **refactor-pro agent**: Analyze code structure, duplication, design patterns, and separation of concerns. Include: "Do NOT run any tests. Only read and analyze code."
-8. **fastapi-pro agent** (if any API/route files changed): Review endpoint design, dependency injection, middleware, response models. Include: "Do NOT run any tests. Only read and analyze code."
-9. **streamlit-pro agent** (if any UI files changed): Review UI patterns, state management, layout, caching. Include: "Do NOT run any tests. Only read and analyze code."
-10. **debugger agent**: Hunt for potential runtime bugs, race conditions, resource leaks, error handling gaps. Include: "Do NOT run any tests. Only read and analyze code."
+5. **python-pro agent** (scope: async & performance): Review async patterns, potential deadlocks, performance anti-patterns, N+1 queries, inefficient loops. Additional scope instruction: "Focus on async correctness and performance."
+6. **python-pro agent** (scope: types & idioms): Review type hints, modern Python idioms, Pydantic model usage, dataclass patterns. Additional scope instruction: "Focus on type safety and Pythonic patterns."
+7. **refactor-pro agent**: Analyze code structure, duplication, design patterns, and separation of concerns.
+8. **fastapi-pro agent** (if any API/route files changed): Review endpoint design, dependency injection, middleware, response models.
+9. **streamlit-pro agent** (if any UI files changed): Review UI patterns, state management, layout, caching.
+10. **debugger agent**: Hunt for potential runtime bugs, race conditions, resource leaks, error handling gaps.
 11. Run lint and format check (identify only, don't fix yet):
     ```bash
     uv run ruff check .
@@ -95,9 +118,36 @@ Launch ALL in parallel (10+ agents + lint). Split reviews into focused, non-over
 
 Note: For large changes, agents 8 and 9 are conditional on file types changed. If neither API nor UI files are modified, launch additional focused code-reviewer agents scoped to specific subdirectories instead.
 
+## Phase 2.5: Deduplicate & Triage
+
+Before fixing anything, process all findings from Phase 2:
+
+### Deduplication
+
+Multiple agents will often flag the same issue (e.g., python-pro and code-reviewer both catch a missing type hint, or security-scanner and debugger both flag the same unvalidated input). Merge duplicate findings:
+
+1. Group all findings by **file + line range** (findings within 5 lines of each other on the same file are likely duplicates)
+2. For each group, keep the most detailed description and the highest severity tag
+3. Combine any unique context from different agents into the merged finding
+
+### Severity Triage
+
+Sort the deduplicated findings by severity and plan the fix order:
+
+1. **CRITICAL** — fix first, always. These block the PR.
+2. **HIGH** — fix in the same iteration as CRITICAL if possible
+3. **MEDIUM** — fix in second iteration if time allows
+4. **LOW** — fix only if there are few other issues; otherwise note them in the summary but skip fixing
+
+If there are more than 15 deduplicated findings, drop LOW-severity items from the fix plan entirely and focus on CRITICAL + HIGH + MEDIUM.
+
+### Output
+
+Produce a structured fix plan listing each finding with: severity, file(s), line(s), description, and which agent type should fix it. Use this plan to drive Phase 3.
+
 ## Phase 3: Fix Issues (max 3 iterations)
 
-Collect all findings from Phase 2 and categorize them. The fix strategy depends on how many independent issue groups there are.
+Execute the fix plan from Phase 2.5. The fix strategy depends on how many independent issue groups there are.
 
 ### Choosing the right agent per issue type
 
@@ -140,15 +190,33 @@ uv run ruff check --fix .
 uv run ruff format .
 ```
 
-## Phase 4: Verify (read-only parallel, then loop if needed)
+## Phase 4: Verify (read-only parallel, scaled to match Phase 2 tier)
 
-Launch in parallel:
-1. **code-reviewer agent**: Quick review of the fixes. Include: "Do NOT run any tests or pytest commands. Only read and analyze code."
+Verification should be proportional to the review depth. Use the same change-size tier from Phase 2.
+
+Include `$CHANGED_FILES` in every verification agent's prompt, same as Phase 2. Instruct agents to focus specifically on verifying that the Phase 3 fixes are correct and haven't introduced new issues.
+
+### Small changes — launch 2 agents:
+1. **code-reviewer agent**: Verify the fixes are correct and complete.
 2. **security-scanner agent**: Re-scan for remaining issues
+
+### Medium changes — launch 4 agents:
+1. **code-reviewer agent**: Verify the fixes are correct and complete.
+2. **security-scanner agent**: Re-scan for remaining issues
+3. **python-pro agent**: Verify Python-specific fixes (async, types, idioms).
+4. **refactor-pro agent**: Verify structural changes didn't degrade design.
+
+### Large changes — launch 6+ agents:
+1. **code-reviewer agent** (scope: logic & correctness): Verify logic fixes.
+2. **code-reviewer agent** (scope: API contracts): Verify interface fixes.
+3. **security-scanner agent**: Re-scan for remaining issues.
+4. **python-pro agent**: Verify Python-specific fixes.
+5. **refactor-pro agent**: Verify structural changes.
+6. **debugger agent**: Verify no new runtime bugs introduced by fixes.
 
 Do NOT run tests here — tests are run once in `/manage` Phase 5 before merge. `/polish` focuses on code quality, not test verification.
 
-**If any agent reports issues**: loop back to Phase 3 (max 3 total iterations).
+**If any agent reports CRITICAL or HIGH issues**: loop back to Phase 3 (max 3 total iterations). MEDIUM and LOW findings from verification are noted in the summary but do not trigger another iteration.
 
 ## Phase 5: Commit & Push
 
@@ -186,6 +254,38 @@ If CodeRabbit is active:
    - Fix issues sequentially (one agent at a time)
    - Push fixes
    - Re-check review status (max 3 iterations)
+
+## Phase 7: Summary Report
+
+After all phases complete, output a structured summary to the user:
+
+```
+## /polish Summary
+
+**Branch**: <branch name>
+**Change size**: <Small/Medium/Large> (<N> files, <M> lines)
+**Review agents launched**: <count>
+**Iterations**: <N> of 3
+
+### Findings
+| Severity | Found | Fixed | Skipped |
+|----------|-------|-------|---------|
+| CRITICAL | X     | X     | 0       |
+| HIGH     | X     | X     | 0       |
+| MEDIUM   | X     | X     | X       |
+| LOW      | X     | X     | X       |
+
+### Key fixes applied
+- <one-line description of each significant fix>
+
+### Remaining items (not fixed)
+- <any LOW/MEDIUM items that were intentionally skipped, with reason>
+
+### CI Status
+- <passing/failing/pending>
+```
+
+This summary helps the user quickly understand what /polish did without having to read through all the agent outputs.
 
 ---
 
