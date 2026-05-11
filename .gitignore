@@ -2,6 +2,7 @@
 history.jsonl
 projects/
 session-env/
+sessions/
 shell-snapshots/
 tasks/
 todos/
@@ -10,12 +11,15 @@ plans/
 # Cache & generated files
 cache/
 debug/
+downloads/
 file-history/
 paste-cache/
 stats-cache.json
 statsig/
 telemetry/
 ide/
+.last-cleanup
+mcp-needs-auth-cache.json
 
 # Machine-specific settings (paths, local permissions)
 settings.local.json
@@ -27,8 +31,11 @@ backups/
 # Usage data
 usage-data/
 
-# External plugin repositories (managed separately)
+# External plugin repositories & local plugin state (managed separately)
 plugins/marketplaces/
+plugins/cache/
+plugins/data/
+plugins/installed_plugins.json
 
 # Nested claude directory
 .claude/
