@@ -1,6 +1,7 @@
 ---
 name: implement-issue
 description: Implement a GitHub issue comprehensively using parallel subagents
+argument-hint: <issue-number>
 ---
 
 Implement GitHub issue #$ARGUMENTS comprehensively using parallel subagents.
