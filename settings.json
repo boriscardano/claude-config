@@ -1,13 +1,81 @@
 {
-  "model": "opus",
+  "attribution": {
+    "commit": "Co-Authored-By: Claude <noreply@anthropic.com>"
+  },
+  "permissions": {
+    "allow": [
+      "Bash(uv run ruff *)",
+      "Bash(uv run pytest *)",
+      "Bash(gcloud logging read *)",
+      "Bash(npm run typecheck)",
+      "Bash(npm run lint)",
+      "Bash(npm run test:run)",
+      "mcp__playwright__browser_take_screenshot",
+      "mcp__playwright__browser_snapshot",
+      "mcp__playwright__browser_console_messages",
+      "mcp__claude-in-chrome__tabs_context_mcp",
+      "mcp__claude_ai_Google_Drive__search_files",
+      "mcp__claude_ai_Google_Drive__get_file_metadata",
+      "mcp__claude_ai_Google_Drive__read_file_content",
+      "mcp__claude_ai_Attio__search-records",
+      "mcp__claude_ai_Attio__get-records-by-ids",
+      "mcp__claude_ai_Attio__get-note-body",
+      "mcp__claude_ai_Attio__search-notes-by-metadata",
+      "mcp__claude_ai_Attio__list-attribute-definitions",
+      "mcp__claude_ai_Attio__list-records",
+      "mcp__claude_ai_PitchBook_Premium__pitchbook_search",
+      "mcp__claude_ai_Gmail__get_thread",
+      "mcp__claude_ai_Gmail__search_threads",
+      "mcp__claude_ai_Booking_com__accommodations_search"
+    ]
+  },
+  "model": "opus[1m]",
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 /Users/boris/.claude/hooks/git-guard.py",
+            "timeout": 10,
+            "statusMessage": "Checking git guardrails"
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "matcher": "Edit|Write",
         "hooks": [
           {
             "type": "command",
-            "command": "FILE_PATH=$(cat | jq -r '.tool_input.file_path'); if [[ \"$FILE_PATH\" == *.py ]]; then cd $(dirname \"$FILE_PATH\") && uv run ruff format \"$FILE_PATH\" && uv run ruff check --fix \"$FILE_PATH\" 2>/dev/null || true; fi"
+            "command": "/Users/boris/.claude/hooks/ruff-format.sh",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 /Users/boris/.claude/hooks/notify.py",
+            "timeout": 15,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 /Users/boris/.claude/hooks/notify.py",
+            "timeout": 15,
+            "async": true
           }
         ]
       }
@@ -17,26 +85,13 @@
     "type": "command",
     "command": "input=$(cat); model=$(echo \"$input\" | jq -r '.model.display_name'); dir=$(basename \"$(echo \"$input\" | jq -r '.workspace.current_dir')\"); cd \"$(echo \"$input\" | jq -r '.workspace.current_dir')\" 2>/dev/null; printf '\\033[2m\\033[32m➜\\033[0m '; printf '\\033[2m\\033[36m%s\\033[0m' \"$dir\"; if git rev-parse --git-dir >/dev/null 2>&1; then branch=$(git symbolic-ref --short HEAD 2>/dev/null || git rev-parse --short HEAD 2>/dev/null); if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then dirty=' \\033[2m\\033[33m✗\\033[0m'; else dirty=''; fi; printf ' \\033[2m\\033[34mgit:(\\033[31m%s\\033[34m)%b\\033[0m' \"$branch\" \"$dirty\"; fi; printf ' \\033[2m| \\033[35m%s\\033[0m' \"$model\""
   },
+  "enabledPlugins": {
+    "vercel@claude-plugins-official": true,
+    "supabase@claude-plugins-official": true
+  },
   "alwaysThinkingEnabled": true,
+  "effortLevel": "high",
+  "tui": "fullscreen",
   "skipDangerousModePermissionPrompt": true,
-  "mcpServers": {
-    "chrome-devtools": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "chrome-devtools-mcp@latest",
-        "--isolated"
-      ]
-    },
-    "supabase": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@supabase/mcp-server-supabase@latest"
-      ],
-      "env": {
-        "SUPABASE_ACCESS_TOKEN": "${SUPABASE_ACCESS_TOKEN}"
-      }
-    }
-  }
+  "theme": "dark"
 }

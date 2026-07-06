@@ -1,6 +1,7 @@
 ---
 name: batch-implement
 description: Implement multiple related GitHub issues in a single feature branch
+argument-hint: <issue1> <issue2> [issue3...]
 ---
 
 Implement multiple related GitHub issues in a single feature branch.
@@ -93,7 +94,7 @@ For each issue (in the order determined by Phase 2):
    ```bash
    cd <WORKTREE_DIR> && git add -A && git commit -m "<prefix>(<scope>): <description> (#<issue_number>)
 
-   Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
+   Co-Authored-By: Claude <noreply@anthropic.com>"
    ```
    Use the commit prefix determined in Phase 2 (`fix:`, `feat:`, `refactor:`, etc.).
 

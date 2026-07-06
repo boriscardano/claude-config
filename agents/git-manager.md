@@ -28,9 +28,9 @@ Follow Conventional Commits specification:
 - Separate refactoring from feature changes
 
 ### Co-Author Footer
-Always include the Co-Authored-By footer in commit messages:
+Always include the Co-Authored-By footer in commit messages. Use the generic form — never hardcode a model version (it goes stale):
 ```
-Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+Co-Authored-By: Claude <noreply@anthropic.com>
 ```
 
 ### Workflow

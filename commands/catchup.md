@@ -25,10 +25,12 @@ Sync with remote and show all in-progress work so I can resume.
    - `git diff` — unstaged changes
    - `git diff --cached` — staged changes
    - `git log origin/main..HEAD --oneline` — unpushed commits
+   - `git stash list` — stashed work that might be forgotten
 
-5. **Check for active worktrees**:
+5. **Check for active worktrees and open PRs**:
    ```bash
    git worktree list
+   gh pr list --author "@me" --state open --limit 10
    ```
 
-6. Summarize what work is in progress and ask what I'd like to continue with.
+6. Summarize what work is in progress (including any stashes, worktrees, and open PRs awaiting review/merge) and ask what I'd like to continue with.

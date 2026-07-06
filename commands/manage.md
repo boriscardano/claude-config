@@ -1,6 +1,7 @@
 ---
 name: manage
 description: Manager Mode - coordinate complex work by planning, delegating to subagents, and reviewing results
+argument-hint: <task description>
 ---
 
 # Manager Mode
@@ -143,7 +144,7 @@ Each `/polish` round reviews, fixes, tests, commits, and pushes. Do NOT skip thi
    - Test results (pass/fail counts)
    - PR URL
    - What needs attention (if anything)
-   - Suggested next steps (CodeRabbit review, `/ship`, etc.)
+   - Suggested next steps (CodeRabbit review, merge — only after explicit user confirmation)
 4. **Status updates**: Report to the user after each phase transition and after each task completion
 
 ## Context Management
