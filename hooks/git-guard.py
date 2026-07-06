@@ -2,8 +2,10 @@
 """PreToolUse guard for the Bash tool — enforces CLAUDE.md git rules.
 
 - DENY any `git push` that targets main/master (never push to main).
-- ASK on `gh pr merge` / `gh api ...merge...` (merging needs explicit user
-  confirmation; the permission prompt is that confirmation).
+- ASK on `gh pr merge` / `gh api ...merge...`. The hook cannot know whether the
+  user asked for the merge, so it delegates that judgment to a confirmation
+  prompt. The policy "only merge when the user explicitly asked" is enforced at
+  the instruction layer (CLAUDE.md / pr-manager); this prompt is the human gate.
 
 Fail-open on unexpected errors (a crashing guard must not block all Bash),
 fail-closed when a push target cannot be determined.
@@ -256,11 +258,11 @@ def main():
         emit("deny", reason)
     elif wants_merge:
         emit(
-            "deny",
-            "CLAUDE.md: PRs are merged by Boris himself, never by Claude. "
-            "Verify the PR is ready (CI green, reviews approved, no conflicts), "
-            "then hand Boris the exact command to run: "
-            "`! gh pr merge <PR#> --squash --delete-branch`",
+            "ask",
+            "Confirm PR merge. Only proceed if Boris explicitly asked for this "
+            "merge in his request — never autonomously, and never as a side effect "
+            "of /polish, /manage, /implement-issue, or because CI/CodeRabbit passed. "
+            "If it wasn't explicitly requested, decline and report the PR as ready instead.",
         )
 
 

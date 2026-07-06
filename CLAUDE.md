@@ -1,6 +1,6 @@
 - never push to main branch, always create feature branch and pull request
-- CRITICAL: never merge PRs without explicit user confirmation - always ask first
-- NOTE: both rules are mechanically enforced by a PreToolUse hook (~/.claude/hooks/git-guard.py): pushes to main/master are denied, and `gh pr merge` is always denied — Claude never merges. When a PR is ready, hand Boris the exact command to run himself: `! gh pr merge <PR#> --squash --delete-branch`. Denials are intentional; never attempt workarounds
+- CRITICAL: merge a PR ONLY when the user explicitly asks you to merge it in that request. Never merge autonomously, never as a side effect of /polish, /manage, /implement-issue, or /batch-implement, and never just because CI/CodeRabbit passed. When a merge wasn't explicitly requested, verify readiness and report the PR as ready instead of merging.
+- NOTE: a PreToolUse hook (~/.claude/hooks/git-guard.py) backs these up mechanically: pushes to main/master are hard-denied (no exceptions — branch and open a PR). `gh pr merge` is NOT blocked; it triggers a confirmation prompt, because the hook can't see whether you asked — that intent rule above is yours to honor. Approving the prompt is fine when the user genuinely asked; never route around the push-to-main denial (no `gh api` workarounds)
 - CRITICAL: before asking to merge, run thorough local tests (uv run pytest, start app locally, verify key changes work)
 - CRITICAL: after finishing ANY feature or bug fix, automatically run /polish before asking to merge — do NOT wait to be asked. One pass for a normal change; 3-5 passes for large PRs (50+ files)
 - CRITICAL: test web applications with Chrome MCP to verify they actually work in a browser
