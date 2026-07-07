@@ -1,6 +1,7 @@
 ---
 name: polish
 description: Review all changes, fix issues, commit and push to origin. Optionally pass a PR number to polish a specific pull request. Use PROACTIVELY before merging PRs, when cleaning up code quality, reviewing changes before pushing, or when the user wants a thorough automated review-fix-verify cycle. Also useful after finishing a feature branch, before requesting code review, or when the user says things like "clean this up", "make it ready for review", or "fix whatever's wrong".
+argument-hint: "[pr-number]"
 ---
 
 Execute the complete code polishing workflow: review changes, fix issues, verify, commit, and push.
@@ -214,11 +215,13 @@ Include `$CHANGED_FILES` in every verification agent's prompt, same as Phase 2. 
 5. **refactor-pro agent**: Verify structural changes.
 6. **debugger agent**: Verify no new runtime bugs introduced by fixes.
 
-Do NOT run tests here — tests are run once in `/manage` Phase 5 before merge. `/polish` focuses on code quality, not test verification.
+Do NOT run tests here — `/polish` focuses on code quality, not test verification. Tests run once elsewhere: in `/manage`/`/implement-issue` phases when orchestrated, or as the thorough local test pass before asking to merge (per CLAUDE.md) when `/polish` is run standalone.
 
 **If any agent reports CRITICAL or HIGH issues**: loop back to Phase 3 (max 3 total iterations). MEDIUM and LOW findings from verification are noted in the summary but do not trigger another iteration.
 
 ## Phase 5: Commit & Push
+
+0. **Never commit on main/master.** If the current branch is main or master (e.g., `/polish` was run on a dirty main checkout), create a feature branch first — `git checkout -b polish/<short-topic>` — before committing. The push-to-main guard hook will deny the push otherwise.
 
 1. **Stage specific files** — list them by name, not `git add -A`. This avoids accidentally committing secrets (.env), credentials, or large binaries.
    ```bash

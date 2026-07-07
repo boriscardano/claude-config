@@ -40,5 +40,9 @@ plugins/installed_plugins.json
 # Nested claude directory
 .claude/
 
+# Aspire11-specific local agents (contain internal references — kept local-only)
+agents/pitchbook-researcher.md
+agents/attio-event-importer.md
+
 # OS files
 .DS_Store
